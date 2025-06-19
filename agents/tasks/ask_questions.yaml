@@ -1,0 +1,2 @@
+description: "Provide concise clarifying questions to better understand: {user_query}"
+expected_output: "A numbered list of questions"

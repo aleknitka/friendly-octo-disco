@@ -1,27 +1,47 @@
 import os
+import yaml
 import gradio as gr
 from crewai import Agent, Task, Crew
 
-# Ensure API key is provided for the language model
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-if not OPENAI_API_KEY:
-    raise EnvironmentError("OPENAI_API_KEY environment variable is required")
+from constants import (
+    NUM_TURNS,
+    END_MESSAGE,
+    LM_STUDIO_ENDPOINT,
+    LM_STUDIO_API_KEY,
+    LM_STUDIO_MODEL,
+)
+
+
+def _load_yaml(path: str) -> dict:
+    with open(path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
+def _create_agent(name: str) -> Agent:
+    cfg = _load_yaml(os.path.join("agents", f"{name}.yaml"))
+    return Agent(
+        role=cfg["role"],
+        goal=cfg["goal"],
+        backstory=cfg["backstory"],
+        llm_config={
+            "base_url": LM_STUDIO_ENDPOINT,
+            "api_key": LM_STUDIO_API_KEY,
+            "model": LM_STUDIO_MODEL,
+        },
+    )
+
+
+def _task_details(name: str, **fmt) -> tuple[str, str]:
+    cfg = _load_yaml(os.path.join("agents", "tasks", f"{name}.yaml"))
+    desc = cfg["description"].format(**fmt)
+    return desc, cfg["expected_output"]
 
 
 def ask_questions(user_query: str) -> str:
     """Generate clarifying questions for the given query using CrewAI."""
-    clarifier = Agent(
-        role="Clarifier",
-        goal="Ask clarifying questions to refine user requests",
-        backstory="Expert at gathering specific information.",
-    )
-    question_task = Task(
-        description=(
-            f"Provide concise clarifying questions to better understand: {user_query}"
-        ),
-        expected_output="A numbered list of questions",
-        agent=clarifier,
-    )
+    clarifier = _create_agent("clarifier")
+    desc, out = _task_details("ask_questions", user_query=user_query)
+    question_task = Task(description=desc, expected_output=out, agent=clarifier)
     crew = Crew(agents=[clarifier], tasks=[question_task])
     result = crew.kickoff()
     return str(result)
@@ -29,37 +49,56 @@ def ask_questions(user_query: str) -> str:
 
 def refine_query(user_query: str, user_answers: str) -> str:
     """Generate a refined query using the initial query and user answers."""
-    refiner = Agent(
-        role="Refiner",
-        goal="Create a concise refined query",
-        backstory="Skilled at summarizing detailed requirements.",
+    refiner = _create_agent("refiner")
+    desc, out = _task_details(
+        "refine_query", user_query=user_query, user_answers=user_answers
     )
-    refine_task = Task(
-        description=(
-            "Using the initial query and clarifications, produce a single refined "
-            f"query.\nInitial query: {user_query}\nClarifications: {user_answers}"
-        ),
-        expected_output="The refined query",
-        agent=refiner,
-    )
+    refine_task = Task(description=desc, expected_output=out, agent=refiner)
     crew = Crew(agents=[refiner], tasks=[refine_task])
     result = crew.kickoff()
     return str(result)
 
 
+def proceed_to_next_display(refined_query: str) -> None:
+    """Placeholder for next display after conversation ends."""
+    # This function will be fleshed out in future revisions.
+    print("Next display would receive:", refined_query)
+
+
+def chat(message: str, history: list, state: dict) -> tuple[list, dict]:
+    """Handle a single chat interaction."""
+    if state is None:
+        state = {"turns": 0, "initial_query": ""}
+
+    if state["turns"] == 0:
+        state["initial_query"] = message
+        response = ask_questions(message)
+    else:
+        response = refine_query(state["initial_query"], message)
+
+    state["turns"] += 1
+    history.append((message, response))
+
+    if state["turns"] >= NUM_TURNS:
+        history.append(("", END_MESSAGE))
+        proceed_to_next_display(response)
+
+    return history, state
+
+
 def launch_interface() -> None:
-    """Launch the Gradio interface for query refinement."""
+    """Launch the Gradio chat interface for query refinement."""
     with gr.Blocks() as demo:
         gr.Markdown("# Query Refinement with CrewAI")
-        query = gr.Textbox(label="Initial query")
-        ask_btn = gr.Button("Generate clarifying questions")
-        questions = gr.Textbox(label="Questions")
-        answers = gr.Textbox(label="Your answers")
-        refine_btn = gr.Button("Refine query")
-        refined = gr.Textbox(label="Refined query")
+        chatbot = gr.Chatbot()
+        msg = gr.Textbox(label="Message")
+        state = gr.State({"turns": 0, "initial_query": ""})
 
-        ask_btn.click(ask_questions, inputs=query, outputs=questions)
-        refine_btn.click(refine_query, inputs=[query, answers], outputs=refined)
+        def _submit(user_msg, chat_history, chat_state):
+            return chat(user_msg, chat_history, chat_state)
+
+        msg.submit(_submit, inputs=[msg, chatbot, state], outputs=[chatbot, state])
+        msg.submit(lambda: "", None, msg)  # clear input
 
     demo.launch()
 

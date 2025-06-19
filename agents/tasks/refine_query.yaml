@@ -1,0 +1,2 @@
+description: "Using the initial query and clarifications, produce a single refined query.\nInitial query: {user_query}\nClarifications: {user_answers}"
+expected_output: "The refined query"
