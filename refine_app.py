@@ -1,11 +1,15 @@
 import os
 import gradio as gr
 from crewai import Agent, Task, Crew
+from constants import LM_STUDIO_ENDPOINT, LM_STUDIO_MODEL_NAME
+import openai
 
-# Ensure API key is provided for the language model
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-if not OPENAI_API_KEY:
-    raise EnvironmentError("OPENAI_API_KEY environment variable is required")
+# Configure CrewAI and OpenAI client for LM Studio
+os.environ.setdefault("OPENAI_API_KEY", "lm-studio")
+os.environ["OPENAI_BASE_URL"] = LM_STUDIO_ENDPOINT
+os.environ["OPENAI_MODEL_NAME"] = LM_STUDIO_MODEL_NAME
+openai.api_key = os.environ["OPENAI_API_KEY"]
+openai.base_url = LM_STUDIO_ENDPOINT
 
 
 def ask_questions(user_query: str) -> str:
