@@ -2,6 +2,8 @@ import os
 import yaml
 import gradio as gr
 from crewai import Agent, Task, Crew
+from constants import LM_STUDIO_ENDPOINT, LM_STUDIO_MODEL_NAME
+import openai
 
 from constants import (
     NUM_TURNS,
@@ -35,6 +37,7 @@ def _task_details(name: str, **fmt) -> tuple[str, str]:
     cfg = _load_yaml(os.path.join("agents", "tasks", f"{name}.yaml"))
     desc = cfg["description"].format(**fmt)
     return desc, cfg["expected_output"]
+
 
 
 def ask_questions(user_query: str) -> str:
