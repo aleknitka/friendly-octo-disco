@@ -1,11 +1,13 @@
 # Friendly Octo Disco
 
-This repository contains small experiments. The `refine_app.py` script demonstrates how to use [CrewAI](https://crewai.com) together with a simple Gradio interface.
+This repository contains small experiments. The `refine_app.py` script demonstrates how to use [CrewAI](https://crewai.com) together with a chat-style Gradio interface.
 
 Run the application with LM Studio running locally:
 
 ```bash
 python refine_app.py
 ```
+The interface will first generate clarifying questions for your initial query. After you provide answers, it produces a refined query.
 
-Ensure LM Studio's API server is enabled and matches the endpoint and model defined in `constants.py`. The interface will first generate clarifying questions for your initial query. After you provide answers, it produces a refined query.
+Agent roles and tasks are defined in YAML files inside the `agents/` directory so they can be tweaked without modifying code.
+
